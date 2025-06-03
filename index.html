@@ -476,7 +476,7 @@
             const selectedValue = patternSelect.value;
             manualPatternId = selectedValue === 'current' ? null : selectedValue;
             updateCurrentPatternInfo();
-            resetTimer();
+            // resetTimer();
         }
 
         function switchTab(tabName) {
@@ -577,7 +577,7 @@
             manualPatternId = patternId;
             patternSelect.value = patternId;
             updateCurrentPatternInfo();
-            resetTimer();
+            // resetTimer();
         }
 
         function updateDisplay() {
@@ -641,25 +641,37 @@
         function startAutoMode() {
             const patternId = getCurrentTimePattern();
             const pattern = timePatterns[patternId];
-            
+    
             if (!pattern.redDuration || !pattern.greenDuration) return;
-            
+    
+    // 既存のタイマーをクリア
+            clearInterval(currentInterval);
+    
             let isRed = false;
             startTime = Date.now();
-            
+    
             function cycle() {
+                const currentPatternId = getCurrentTimePattern();
+                const currentPattern = timePatterns[currentPatternId];
+        
+                if (!currentPattern.redDuration || !currentPattern.greenDuration) {
+            // パターンが未設定の場合は停止
+                resetTimer();
+                return;
+                }
+        
                 if (isRed) {
                     setLights(false, true);
                     isRed = false;
-                    currentInterval = setTimeout(cycle, pattern.greenDuration);
+                    currentInterval = setTimeout(cycle, currentPattern.greenDuration);
                 } else {
                     setLights(true, false);
                     isRed = true;
-                    currentInterval = setTimeout(cycle, pattern.redDuration);
+                    currentInterval = setTimeout(cycle, currentPattern.redDuration);
                 }
                 startTime = Date.now();
-            }
-            
+            } 
+    
             currentInterval = setTimeout(cycle, pattern.greenDuration);
         }
 
@@ -685,6 +697,15 @@
         setInterval(() => {
             if (!manualPatternId) {
                 updateCurrentPatternInfo();
+        // 自動モード中なら新しいパターンで継続
+                if (phase === 'running') {
+                    const newPatternId = getCurrentTimePattern();
+                    const newPattern = timePatterns[newPatternId];
+                    if (newPattern.redDuration && newPattern.greenDuration) {
+                // パターンが変わった場合のみ再開始
+                        startAutoMode();
+                    }
+                }
             }
         }, 60000);
 
