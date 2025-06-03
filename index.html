@@ -27,7 +27,7 @@
             padding: 30px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             text-align: center;
-            max-width: 400px;
+            max-width: 500px;
             width: 100%;
         }
 
@@ -35,6 +35,57 @@
             color: #333;
             margin-bottom: 30px;
             font-size: 24px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #f0f0f0;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            background: #f0f0f0;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .tab.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+
+        .time-pattern-selector {
+            margin-bottom: 20px;
+        }
+
+        .pattern-select {
+            padding: 10px 15px;
+            border-radius: 10px;
+            border: 2px solid #ddd;
+            font-size: 16px;
+            background: white;
+            width: 100%;
+            max-width: 300px;
+        }
+
+        .pattern-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .current-pattern {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 5px;
         }
 
         .traffic-light {
@@ -146,6 +197,104 @@
             margin-top: 20px;
         }
 
+        .pattern-management {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .pattern-management.active {
+            display: block;
+        }
+
+        .pattern-list {
+            margin-bottom: 20px;
+        }
+
+        .pattern-item {
+            background: white;
+            border: 2px solid #eee;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            text-align: left;
+        }
+
+        .pattern-item.active-pattern {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .pattern-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .pattern-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .pattern-time {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .pattern-details {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .pattern-actions {
+            margin-top: 10px;
+        }
+
+        .small-btn {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        .add-pattern {
+            background: white;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .add-pattern:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .form-group {
+            margin: 15px 0;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         @media (max-width: 480px) {
             .container {
                 padding: 20px;
@@ -168,6 +317,10 @@
                 padding: 12px 25px;
                 font-size: 14px;
             }
+            
+            .tabs {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -175,40 +328,257 @@
     <div class="container">
         <h1>🚦 信号機タイマー</h1>
         
-        <div class="traffic-light">
-            <div class="light red off" id="redLight"></div>
-            <div class="light green off" id="greenLight"></div>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('timer')">タイマー</button>
+            <button class="tab" onclick="switchTab('patterns')">時間帯設定</button>
         </div>
-        
-        <div class="timer-display" id="timerDisplay">00:00</div>
-        
-        <div class="status waiting" id="status">
-            実際の信号機が赤になったタイミングでボタンを押してください
+
+        <div id="timer-tab" class="tab-content">
+            <div class="time-pattern-selector">
+                <select class="pattern-select" id="patternSelect" onchange="switchPattern()">
+                    <option value="current">現在の時間帯 (自動選択)</option>
+                </select>
+                <div class="current-pattern" id="currentPatternInfo">
+                    現在: デフォルト (未設定)
+                </div>
+            </div>
+            
+            <div class="traffic-light">
+                <div class="light red off" id="redLight"></div>
+                <div class="light green off" id="greenLight"></div>
+            </div>
+            
+            <div class="timer-display" id="timerDisplay">00:00</div>
+            
+            <div class="status waiting" id="status">
+                実際の信号機が赤になったタイミングでボタンを押してください
+            </div>
+            
+            <div class="controls">
+                <button class="btn" id="syncBtn" onclick="handleSync()">
+                    赤信号開始
+                </button>
+                <button class="btn reset-btn" onclick="resetTimer()">
+                    リセット
+                </button>
+            </div>
         </div>
-        
-        <div class="controls">
-            <button class="btn" id="syncBtn" onclick="handleSync()">
-                赤信号開始
-            </button>
-            <button class="btn reset-btn" onclick="resetTimer()">
-                リセット
-            </button>
+
+        <div id="patterns-tab" class="tab-content pattern-management">
+            <div class="pattern-list" id="patternList">
+                <!-- パターンリストがここに表示される -->
+            </div>
+            
+            <div class="add-pattern" onclick="showAddPatternForm()">
+                ➕ 新しい時間帯パターンを追加
+            </div>
+            
+            <div id="addPatternForm" style="display: none;">
+                <div class="form-group">
+                    <label>パターン名</label>
+                    <input type="text" id="patternName" placeholder="例: 通勤時間">
+                </div>
+                <div class="form-group">
+                    <label>開始時間</label>
+                    <input type="time" id="startTime">
+                </div>
+                <div class="form-group">
+                    <label>終了時間</label>
+                    <input type="time" id="endTime">
+                </div>
+                <div class="controls">
+                    <button class="btn" onclick="addPattern()">追加</button>
+                    <button class="btn" onclick="cancelAddPattern()" style="background: #ccc;">キャンセル</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         let startTime = null;
-        let redDuration = null;
-        let greenDuration = null;
         let currentInterval = null;
         let timerInterval = null;
-        let phase = 'waiting'; // waiting, measuring-red, measuring-green, running
+        let phase = 'waiting';
+        let currentPatternId = null;
+        let manualPatternId = null; // 手動選択されたパターン
+
+        // 時間帯パターンの管理
+        let timePatterns = JSON.parse(localStorage.getItem('timePatterns') || '{}');
+
+        // デフォルトパターンがない場合は作成
+        if (Object.keys(timePatterns).length === 0) {
+            timePatterns = {
+                'default': {
+                    name: 'デフォルト',
+                    startTime: '00:00',
+                    endTime: '23:59',
+                    redDuration: null,
+                    greenDuration: null
+                }
+            };
+            savePatterns();
+        }
 
         const redLight = document.getElementById('redLight');
         const greenLight = document.getElementById('greenLight');
         const syncBtn = document.getElementById('syncBtn');
         const status = document.getElementById('status');
         const timerDisplay = document.getElementById('timerDisplay');
+        const patternSelect = document.getElementById('patternSelect');
+        const currentPatternInfo = document.getElementById('currentPatternInfo');
+
+        function savePatterns() {
+            localStorage.setItem('timePatterns', JSON.stringify(timePatterns));
+        }
+
+        function getCurrentTimePattern() {
+            if (manualPatternId) {
+                return manualPatternId;
+            }
+            
+            const now = new Date();
+            const currentTime = now.getHours().toString().padStart(2, '0') + ':' + 
+                              now.getMinutes().toString().padStart(2, '0');
+            
+            for (const [id, pattern] of Object.entries(timePatterns)) {
+                if (currentTime >= pattern.startTime && currentTime <= pattern.endTime) {
+                    return id;
+                }
+            }
+            
+            return 'default';
+        }
+
+        function updatePatternSelect() {
+            patternSelect.innerHTML = '<option value="current">現在の時間帯 (自動選択)</option>';
+            
+            for (const [id, pattern] of Object.entries(timePatterns)) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = `${pattern.name} (${pattern.startTime}-${pattern.endTime})`;
+                patternSelect.appendChild(option);
+            }
+        }
+
+        function updateCurrentPatternInfo() {
+            const patternId = getCurrentTimePattern();
+            const pattern = timePatterns[patternId];
+            
+            if (pattern) {
+                const redSec = pattern.redDuration ? Math.round(pattern.redDuration / 1000) : '未設定';
+                const greenSec = pattern.greenDuration ? Math.round(pattern.greenDuration / 1000) : '未設定';
+                currentPatternInfo.textContent = 
+                    `現在: ${pattern.name} | 赤:${redSec}秒 青:${greenSec}秒`;
+            }
+        }
+
+        function switchPattern() {
+            const selectedValue = patternSelect.value;
+            manualPatternId = selectedValue === 'current' ? null : selectedValue;
+            updateCurrentPatternInfo();
+            resetTimer();
+        }
+
+        function switchTab(tabName) {
+            // タブボタンの状態更新
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // コンテンツの表示切り替え
+            document.getElementById('timer-tab').style.display = tabName === 'timer' ? 'block' : 'none';
+            document.getElementById('patterns-tab').style.display = tabName === 'patterns' ? 'block' : 'none';
+            
+            if (tabName === 'patterns') {
+                updatePatternList();
+            }
+        }
+
+        function updatePatternList() {
+            const patternList = document.getElementById('patternList');
+            patternList.innerHTML = '';
+            
+            const currentPatternId = getCurrentTimePattern();
+            
+            for (const [id, pattern] of Object.entries(timePatterns)) {
+                const div = document.createElement('div');
+                div.className = `pattern-item ${id === currentPatternId ? 'active-pattern' : ''}`;
+                
+                const redSec = pattern.redDuration ? Math.round(pattern.redDuration / 1000) : '未設定';
+                const greenSec = pattern.greenDuration ? Math.round(pattern.greenDuration / 1000) : '未設定';
+                
+                div.innerHTML = `
+                    <div class="pattern-header">
+                        <div class="pattern-name">${pattern.name}</div>
+                        <div class="pattern-time">${pattern.startTime} - ${pattern.endTime}</div>
+                    </div>
+                    <div class="pattern-details">
+                        赤信号: ${redSec}秒 | 青信号: ${greenSec}秒
+                    </div>
+                    <div class="pattern-actions">
+                        <button class="btn small-btn" onclick="calibratePattern('${id}')">計測</button>
+                        ${id !== 'default' ? `<button class="btn small-btn reset-btn" onclick="deletePattern('${id}')">削除</button>` : ''}
+                    </div>
+                `;
+                
+                patternList.appendChild(div);
+            }
+        }
+
+        function showAddPatternForm() {
+            document.getElementById('addPatternForm').style.display = 'block';
+        }
+
+        function cancelAddPattern() {
+            document.getElementById('addPatternForm').style.display = 'none';
+            document.getElementById('patternName').value = '';
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
+        }
+
+        function addPattern() {
+            const name = document.getElementById('patternName').value.trim();
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+            
+            if (!name || !startTime || !endTime) {
+                alert('すべての項目を入力してください。');
+                return;
+            }
+            
+            const id = 'pattern_' + Date.now();
+            timePatterns[id] = {
+                name: name,
+                startTime: startTime,
+                endTime: endTime,
+                redDuration: null,
+                greenDuration: null
+            };
+            
+            savePatterns();
+            updatePatternSelect();
+            updatePatternList();
+            cancelAddPattern();
+        }
+
+        function deletePattern(id) {
+            if (confirm('このパターンを削除しますか？')) {
+                delete timePatterns[id];
+                savePatterns();
+                updatePatternSelect();
+                updatePatternList();
+            }
+        }
+
+        function calibratePattern(patternId) {
+            switchTab('timer');
+            document.querySelectorAll('.tab')[0].classList.add('active');
+            document.querySelectorAll('.tab')[1].classList.remove('active');
+            
+            manualPatternId = patternId;
+            patternSelect.value = patternId;
+            updateCurrentPatternInfo();
+            resetTimer();
+        }
 
         function updateDisplay() {
             if (!startTime) return;
@@ -231,22 +601,21 @@
 
         function handleSync() {
             const now = Date.now();
+            const patternId = getCurrentTimePattern();
             
             switch(phase) {
                 case 'waiting':
-                    // 赤信号開始の計測
                     startTime = now;
                     phase = 'measuring-red';
                     setLights(true, false);
                     syncBtn.textContent = '青信号開始';
                     updateStatus('赤信号計測中... 青に変わったタイミングでボタンを押してください', 'measuring');
-                    
                     timerInterval = setInterval(updateDisplay, 100);
                     break;
                     
                 case 'measuring-red':
-                    // 赤信号時間を記録、青信号開始
-                    redDuration = now - startTime;
+                    const redDuration = now - startTime;
+                    timePatterns[patternId].redDuration = redDuration;
                     startTime = now;
                     phase = 'measuring-green';
                     setLights(false, true);
@@ -255,37 +624,43 @@
                     break;
                     
                 case 'measuring-green':
-                    // 青信号時間を記録、自動モード開始
-                    greenDuration = now - startTime;
+                    const greenDuration = now - startTime;
+                    timePatterns[patternId].greenDuration = greenDuration;
+                    savePatterns();
                     phase = 'running';
                     syncBtn.disabled = true;
                     startAutoMode();
-                    updateStatus(`自動モード開始！ 赤:${Math.round(redDuration/1000)}秒 青:${Math.round(greenDuration/1000)}秒`, 'running');
+                    const redSec = Math.round(timePatterns[patternId].redDuration / 1000);
+                    const greenSec = Math.round(timePatterns[patternId].greenDuration / 1000);
+                    updateStatus(`自動モード開始！ 赤:${redSec}秒 青:${greenSec}秒`, 'running');
+                    updateCurrentPatternInfo();
                     break;
             }
         }
 
         function startAutoMode() {
-            let isRed = false; // 現在青信号から開始
+            const patternId = getCurrentTimePattern();
+            const pattern = timePatterns[patternId];
+            
+            if (!pattern.redDuration || !pattern.greenDuration) return;
+            
+            let isRed = false;
             startTime = Date.now();
             
             function cycle() {
                 if (isRed) {
-                    // 赤→青
                     setLights(false, true);
                     isRed = false;
-                    currentInterval = setTimeout(cycle, greenDuration);
+                    currentInterval = setTimeout(cycle, pattern.greenDuration);
                 } else {
-                    // 青→赤
                     setLights(true, false);
                     isRed = true;
-                    currentInterval = setTimeout(cycle, redDuration);
+                    currentInterval = setTimeout(cycle, pattern.redDuration);
                 }
                 startTime = Date.now();
             }
             
-            // 最初の切り替えを青信号時間後に設定
-            currentInterval = setTimeout(cycle, greenDuration);
+            currentInterval = setTimeout(cycle, pattern.greenDuration);
         }
 
         function resetTimer() {
@@ -294,8 +669,6 @@
             
             phase = 'waiting';
             startTime = null;
-            redDuration = null;
-            greenDuration = null;
             
             setLights(false, false);
             syncBtn.textContent = '赤信号開始';
@@ -304,7 +677,17 @@
             updateStatus('実際の信号機が赤になったタイミングでボタンを押してください', 'waiting');
         }
 
-        // 初期表示更新用のタイマー
+        // 初期化
+        updatePatternSelect();
+        updateCurrentPatternInfo();
+        
+        // 1分ごとに現在のパターンをチェック
+        setInterval(() => {
+            if (!manualPatternId) {
+                updateCurrentPatternInfo();
+            }
+        }, 60000);
+
         setInterval(() => {
             if (phase === 'measuring-red' || phase === 'measuring-green') {
                 updateDisplay();
