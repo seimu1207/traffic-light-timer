@@ -396,11 +396,11 @@
 
     <script>
         let startTime = null;
-        let currentInterval = null;
         let timerInterval = null;
         let phase = 'waiting';
         let currentPatternId = null;
         let manualPatternId = null; // 手動選択されたパターン
+        let runningPatterns = {}; // 各パターンの動作状態を管理
 
         // 時間帯パターンの管理
         let timePatterns = JSON.parse(localStorage.getItem('timePatterns') || '{}');
@@ -476,7 +476,9 @@
             const selectedValue = patternSelect.value;
             manualPatternId = selectedValue === 'current' ? null : selectedValue;
             updateCurrentPatternInfo();
-            // resetTimer();
+            
+            // 現在のパターンの表示を更新
+            updateCurrentPatternDisplay();
         }
 
         function switchTab(tabName) {
@@ -506,9 +508,12 @@
                 const redSec = pattern.redDuration ? Math.round(pattern.redDuration / 1000) : '未設定';
                 const greenSec = pattern.greenDuration ? Math.round(pattern.greenDuration / 1000) : '未設定';
                 
+                // 動作状態の表示
+                const isRunning = runningPatterns[id] ? ' (動作中)' : '';
+                
                 div.innerHTML = `
                     <div class="pattern-header">
-                        <div class="pattern-name">${pattern.name}</div>
+                        <div class="pattern-name">${pattern.name}${isRunning}</div>
                         <div class="pattern-time">${pattern.startTime} - ${pattern.endTime}</div>
                     </div>
                     <div class="pattern-details">
@@ -562,6 +567,12 @@
 
         function deletePattern(id) {
             if (confirm('このパターンを削除しますか？')) {
+                // 動作中のパターンを停止
+                if (runningPatterns[id]) {
+                    clearInterval(runningPatterns[id].interval);
+                    delete runningPatterns[id];
+                }
+                
                 delete timePatterns[id];
                 savePatterns();
                 updatePatternSelect();
@@ -577,7 +588,6 @@
             manualPatternId = patternId;
             patternSelect.value = patternId;
             updateCurrentPatternInfo();
-            // resetTimer();
         }
 
         function updateDisplay() {
@@ -629,6 +639,9 @@
                     savePatterns();
                     phase = 'running';
                     syncBtn.disabled = true;
+                    
+                    currentPatternId = patternId; // 現在計測したパターンを記録
+                    
                     startAutoMode();
                     const redSec = Math.round(timePatterns[patternId].redDuration / 1000);
                     const greenSec = Math.round(timePatterns[patternId].greenDuration / 1000);
@@ -641,42 +654,79 @@
         function startAutoMode() {
             const patternId = getCurrentTimePattern();
             const pattern = timePatterns[patternId];
-    
+            
             if (!pattern.redDuration || !pattern.greenDuration) return;
-    
-    // 既存のタイマーをクリア
-            clearInterval(currentInterval);
-    
-            let isRed = false;
-            startTime = Date.now();
-    
+            
+            // このパターンの自動モードを開始
+            startPatternAutoMode(patternId);
+            
+            // 現在のパターンとして表示更新
+            updateCurrentPatternDisplay();
+        }
+
+        function startPatternAutoMode(patternId) {
+            const pattern = timePatterns[patternId];
+            
+            // 既存のタイマーがあればクリア
+            if (runningPatterns[patternId]) {
+                clearInterval(runningPatterns[patternId].interval);
+            }
+            
+            // このパターンの動作状態を初期化
+            runningPatterns[patternId] = {
+                isRed: false, // 青から開始
+                interval: null,
+                startTime: Date.now()
+            };
+            
             function cycle() {
-                const currentPatternId = getCurrentTimePattern();
-                const currentPattern = timePatterns[currentPatternId];
-        
-                if (!currentPattern.redDuration || !currentPattern.greenDuration) {
-            // パターンが未設定の場合は停止
-                resetTimer();
-                return;
+                const patternData = runningPatterns[patternId];
+                const currentPattern = timePatterns[patternId];
+                
+                if (!currentPattern || !currentPattern.redDuration || !currentPattern.greenDuration) {
+                    return;
                 }
-        
-                if (isRed) {
-                    setLights(false, true);
-                    isRed = false;
-                    currentInterval = setTimeout(cycle, currentPattern.greenDuration);
+                
+                if (patternData.isRed) {
+                    // 赤→青
+                    patternData.isRed = false;
+                    patternData.interval = setTimeout(cycle, currentPattern.greenDuration);
                 } else {
-                    setLights(true, false);
-                    isRed = true;
-                    currentInterval = setTimeout(cycle, currentPattern.redDuration);
+                    // 青→赤
+                    patternData.isRed = true;
+                    patternData.interval = setTimeout(cycle, currentPattern.redDuration);
                 }
-                startTime = Date.now();
-            } 
-    
-            currentInterval = setTimeout(cycle, pattern.greenDuration);
+                
+                patternData.startTime = Date.now();
+                
+                // 現在選択中のパターンなら表示更新
+                if (patternId === getCurrentTimePattern()) {
+                    updateCurrentPatternDisplay();
+                }
+            }
+            
+            // 最初の切り替えを青信号時間後に設定
+            runningPatterns[patternId].interval = setTimeout(cycle, pattern.greenDuration);
+        }
+
+        function updateCurrentPatternDisplay() {
+            const patternId = getCurrentTimePattern();
+            const runningPattern = runningPatterns[patternId];
+            
+            if (runningPattern) {
+                setLights(runningPattern.isRed, !runningPattern.isRed);
+                startTime = runningPattern.startTime; // タイマー表示用
+            }
         }
 
         function resetTimer() {
-            clearInterval(currentInterval);
+            // 現在のパターンのみ停止
+            const patternId = getCurrentTimePattern();
+            if (runningPatterns[patternId]) {
+                clearInterval(runningPatterns[patternId].interval);
+                delete runningPatterns[patternId];
+            }
+            
             clearInterval(timerInterval);
             
             phase = 'waiting';
@@ -697,13 +747,13 @@
         setInterval(() => {
             if (!manualPatternId) {
                 updateCurrentPatternInfo();
-        // 自動モード中なら新しいパターンで継続
+                // 自動モード中なら新しいパターンで継続
                 if (phase === 'running') {
                     const newPatternId = getCurrentTimePattern();
                     const newPattern = timePatterns[newPatternId];
                     if (newPattern.redDuration && newPattern.greenDuration) {
-                // パターンが変わった場合のみ再開始
-                        startAutoMode();
+                        // パターンが変わった場合のみ再開始
+                        updateCurrentPatternDisplay();
                     }
                 }
             }
