@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>信号機タイマー</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+
+        .traffic-light {
+            background: #333;
+            border-radius: 20px;
+            padding: 20px;
+            margin: 30px auto;
+            width: 120px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .light {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 15px auto;
+            transition: all 0.3s ease;
+            border: 3px solid #555;
+        }
+
+        .red {
+            background: #ff4444;
+            box-shadow: 0 0 30px rgba(255, 68, 68, 0.8);
+        }
+
+        .red.off {
+            background: #660000;
+            box-shadow: none;
+        }
+
+        .green {
+            background: #44ff44;
+            box-shadow: 0 0 30px rgba(68, 255, 68, 0.8);
+        }
+
+        .green.off {
+            background: #006600;
+            box-shadow: none;
+        }
+
+        .controls {
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .timer-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 10px;
+        }
+
+        .status {
+            font-size: 18px;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .status.waiting {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.measuring {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status.running {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .reset-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            margin-top: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            .traffic-light {
+                width: 100px;
+            }
+            
+            .light {
+                width: 60px;
+                height: 60px;
+            }
+            
+            .btn {
+                padding: 12px 25px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚦 信号機タイマー</h1>
+        
+        <div class="traffic-light">
+            <div class="light red off" id="redLight"></div>
+            <div class="light green off" id="greenLight"></div>
+        </div>
+        
+        <div class="timer-display" id="timerDisplay">00:00</div>
+        
+        <div class="status waiting" id="status">
+            実際の信号機が赤になったタイミングでボタンを押してください
+        </div>
+        
+        <div class="controls">
+            <button class="btn" id="syncBtn" onclick="handleSync()">
+                赤信号開始
+            </button>
+            <button class="btn reset-btn" onclick="resetTimer()">
+                リセット
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let startTime = null;
+        let redDuration = null;
+        let greenDuration = null;
+        let currentInterval = null;
+        let timerInterval = null;
+        let phase = 'waiting'; // waiting, measuring-red, measuring-green, running
+
+        const redLight = document.getElementById('redLight');
+        const greenLight = document.getElementById('greenLight');
+        const syncBtn = document.getElementById('syncBtn');
+        const status = document.getElementById('status');
+        const timerDisplay = document.getElementById('timerDisplay');
+
+        function updateDisplay() {
+            if (!startTime) return;
+            
+            const elapsed = Date.now() - startTime;
+            const minutes = Math.floor(elapsed / 60000);
+            const seconds = Math.floor((elapsed % 60000) / 1000);
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function setLights(red, green) {
+            redLight.className = red ? 'light red' : 'light red off';
+            greenLight.className = green ? 'light green' : 'light green off';
+        }
+
+        function updateStatus(message, className) {
+            status.textContent = message;
+            status.className = `status ${className}`;
+        }
+
+        function handleSync() {
+            const now = Date.now();
+            
+            switch(phase) {
+                case 'waiting':
+                    // 赤信号開始の計測
+                    startTime = now;
+                    phase = 'measuring-red';
+                    setLights(true, false);
+                    syncBtn.textContent = '青信号開始';
+                    updateStatus('赤信号計測中... 青に変わったタイミングでボタンを押してください', 'measuring');
+                    
+                    timerInterval = setInterval(updateDisplay, 100);
+                    break;
+                    
+                case 'measuring-red':
+                    // 赤信号時間を記録、青信号開始
+                    redDuration = now - startTime;
+                    startTime = now;
+                    phase = 'measuring-green';
+                    setLights(false, true);
+                    syncBtn.textContent = '計測完了';
+                    updateStatus('青信号計測中... 赤に変わったタイミングでボタンを押してください', 'measuring');
+                    break;
+                    
+                case 'measuring-green':
+                    // 青信号時間を記録、自動モード開始
+                    greenDuration = now - startTime;
+                    phase = 'running';
+                    syncBtn.disabled = true;
+                    startAutoMode();
+                    updateStatus(`自動モード開始！ 赤:${Math.round(redDuration/1000)}秒 青:${Math.round(greenDuration/1000)}秒`, 'running');
+                    break;
+            }
+        }
+
+        function startAutoMode() {
+            let isRed = false; // 現在青信号から開始
+            startTime = Date.now();
+            
+            function cycle() {
+                if (isRed) {
+                    // 赤→青
+                    setLights(false, true);
+                    isRed = false;
+                    currentInterval = setTimeout(cycle, greenDuration);
+                } else {
+                    // 青→赤
+                    setLights(true, false);
+                    isRed = true;
+                    currentInterval = setTimeout(cycle, redDuration);
+                }
+                startTime = Date.now();
+            }
+            
+            // 最初の切り替えを青信号時間後に設定
+            currentInterval = setTimeout(cycle, greenDuration);
+        }
+
+        function resetTimer() {
+            clearInterval(currentInterval);
+            clearInterval(timerInterval);
+            
+            phase = 'waiting';
+            startTime = null;
+            redDuration = null;
+            greenDuration = null;
+            
+            setLights(false, false);
+            syncBtn.textContent = '赤信号開始';
+            syncBtn.disabled = false;
+            timerDisplay.textContent = '00:00';
+            updateStatus('実際の信号機が赤になったタイミングでボタンを押してください', 'waiting');
+        }
+
+        // 初期表示更新用のタイマー
+        setInterval(() => {
+            if (phase === 'measuring-red' || phase === 'measuring-green') {
+                updateDisplay();
+            }
+        }, 100);
+    </script>
+</body>
+</html>
